@@ -4,9 +4,8 @@ const cors=require('cors')
 const { graphql, buildSchema } = require('graphql');
 const axios = require('axios')
 const gh = require('parse-github-url');
-const API_TOKEN="a374f2f067ad748d0d52ac6699124cd927e1eb46"
 
-axios.defaults.headers.common['Bearer']=API_TOKEN
+axios.defaults.headers.common['Bearer']=process.env.API_TOKEN
 axios.defaults.headers.common['Access-Control-Allow-Origin']= '*'
 const schema = buildSchema(`
   type Query {
