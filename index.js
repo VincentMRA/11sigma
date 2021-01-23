@@ -1,10 +1,13 @@
 const express = require('express');
 const { graphqlHTTP } = require('express-graphql');
-
+const cors=require('cors')
 const { graphql, buildSchema } = require('graphql');
 const axios = require('axios')
-var gh = require('parse-github-url');
+const gh = require('parse-github-url');
+const API_TOKEN="a374f2f067ad748d0d52ac6699124cd927e1eb46"
 
+axios.defaults.headers.common['Bearer']=API_TOKEN
+axios.defaults.headers.common['Access-Control-Allow-Origin']= '*'
 const schema = buildSchema(`
   type Query {
     repo(url:String!, maxNumber:Int): Repo
@@ -17,10 +20,14 @@ const schema = buildSchema(`
     contributors: [Contributor]
   }
   type Contributor{
-    id:Int
+    id:String
     url:String
     avatarUrl:String
-    contributions:Int
+    contributions:String
+    adds:Int
+    dels:Int
+    total:Int
+    commits:Int
   }
 `);
 
@@ -31,27 +38,35 @@ class Repo {
         this.owner=ghInfo.owner
         this.repo_name=ghInfo.name
         this.url=repo.url
-        this.apiURL="https://api.github.com/repos/"+ghInfo.repo+"/contributors"
-        if (repo.maxNumber){
-            this.apiURL+='?page=1&per_page='+repo.maxNumber.toString()
-        } else {
-            this.apiURL+='?page=1&per_page=10'
-        }
-        console.log(this.apiURL)
+        this.apiURL="https://api.github.com/repos/"+ghInfo.repo+"/stats/contributors"
     }
     async contributors() {
         let contributors
         console.log(this.apiURL)
         await axios.get(this.apiURL)
         .then(res=>{ 
-            console.log(res.data)
-            contributors=res.data.map(contr=> {return {
-                id:contr.id,
-                url:contr.url,
-                avatarUrl:contr.avatar_url,
-                contributions:contr.contributions
-            }})
-        })
+          contributors=res.data.map(contr=> {
+            let adds=0
+            let dels=0
+            let commits=0
+            contr.weeks.forEach(x=>{
+              adds+=x.a
+              dels+=x.d
+              commits+=x.c
+            })
+            console.log(contr.author.login,": ",adds," , ",dels,", ",commits)
+            return {
+              id:contr.author.login,
+              url:contr.author.url,
+              avatarUrl:contr.author.avatar_url,
+              contributions:contr.total,
+              adds:adds,
+              dels:dels,
+              total:adds+dels,
+              commits:commits
+          }})
+          
+      })
         return contributors
     }
 }
@@ -66,7 +81,7 @@ var root = {
  
 
 const app = express();
-
+app.use(cors())
 app.use(
   '/graphql',
   graphqlHTTP({
@@ -76,4 +91,4 @@ app.use(
   }),
 );
 const port= process.env.PORT || 4000
-app.listen(port, () => {console.log("SERVER RUNNING!")});
+app.listen(port, () => {console.log("SERVER RUNNING! on port: ", port )});
